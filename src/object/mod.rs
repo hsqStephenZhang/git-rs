@@ -35,7 +35,7 @@ impl std::fmt::Display for ObjectMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Dir => write!(f, "040000"),
-            Self::Normal => write!(f, "100664"),
+            Self::Normal => write!(f, "100644"),
             Self::Executable => write!(f, "100755"),
             Self::SymbolLink => write!(f, "120000"),
         }
@@ -45,10 +45,11 @@ impl std::fmt::Display for ObjectMode {
 impl From<&[u8]> for ObjectMode {
     fn from(raw: &[u8]) -> Self {
         debug_assert!(raw.len() == 6);
+        // dbg!(raw);
 
         match raw {
             b"040000" => Self::Dir,
-            b"100664" => Self::Normal,
+            b"100644" => Self::Normal,
             b"100755" => Self::Executable,
             b"120000" => Self::SymbolLink,
             _ => unreachable!(),

@@ -1,15 +1,3 @@
-// tree <content length><NUL><file mode> <filename><NUL><item sha>...
-// #[derive(Clone, Debug)]
-// pub struct Commit {
-//     attrs: CommitAttrs,
-// }
-
-// impl Commit {
-//     pub fn new(attrs: CommitAttrs) -> Self {
-//         Self { attrs }
-//     }
-// }
-
 #[derive(Clone, Debug)]
 pub struct Commit {
     pub root_sha1: String,
@@ -39,18 +27,18 @@ impl Commit {
 
 #[derive(Clone, Debug)]
 pub struct AuthorInfo {
-    name: String,
-    email: String,
-    timestamp: usize,
-    time_zone: String,
+    pub name: String,
+    pub email: String,
+    pub timestamp: usize,
+    pub time_zone: String,
 }
 
 #[derive(Clone, Debug)]
 pub struct CommitterInfo {
-    name: String,
-    email: String,
-    timestamp: usize,
-    time_zone: String,
+    pub name: String,
+    pub email: String,
+    pub timestamp: usize,
+    pub time_zone: String,
 }
 
 impl AuthorInfo {
