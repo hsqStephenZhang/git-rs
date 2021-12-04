@@ -38,12 +38,12 @@ pub fn encode(content: Vec<u8>) -> Vec<u8> {
     compressed
 }
 
-pub fn decode_file<P: AsRef<Path>>(path: P) -> String {
+pub fn decode_file<P: AsRef<Path>>(path: P) -> Vec<u8> {
     use std::io::prelude::*;
     let bytes = std::fs::read(path).unwrap();
     let mut deflater = ZlibDecoder::new(&bytes[..]);
-    let mut reader = String::new();
-    deflater.read_to_string(&mut reader).unwrap();
+    let mut reader = Vec::new();
+    deflater.read_to_end(&mut reader).unwrap();
     reader
 }
 
@@ -54,20 +54,32 @@ mod tests {
 
     #[test]
     fn test_encode() {
-        let r = encode_file("data/encode_decode/hello");
+        let r = encode_file("data/hello.txt");
         println!("{:x?}", &r);
     }
 
     #[test]
-    fn test_decode() {
-        let r = decode_file("data/encode_decode/3b18e512dba79e4c8300dd08aeb37f8e728b8dad");
+    fn test_decode_blob() {
+        let r = decode_file(".git/objects/3b/18e512dba79e4c8300dd08aeb37f8e728b8dad");
         println!("{:x?}", &r);
-        assert_eq!(&r, "blob 12\0hello world\n");
+        assert_eq!(&r[..], "blob 12\0hello world\n".as_bytes());
+    }
+
+    #[test]
+    fn test_decode_commit() {
+        let r = decode_file(".git/objects/77/a98a3098531ee305c021302cd381386aa41bcd");
+        println!("{:x?}", &r);
+    }
+
+    #[test]
+    fn test_decode_tree() {
+        let r = decode_file(".git/objects/84/65cd187d9bad9e5a7931c2119f16311f9923a7");
+        println!("{:x?}", &r);
     }
 
     #[test]
     fn test_sha_name() {
-        let r = encode_file("data/encode_decode/hello");
+        let r = encode_file("data/hello.txt");
         println!("{:x?}", &r);
     }
 }
