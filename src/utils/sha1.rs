@@ -1,26 +1,11 @@
-use flate2::bufread::ZlibDecoder;
 use flate2::Compression;
-use sha1::{Digest, Sha1};
 use std::io::prelude::*;
 
-use std::{fs, io::BufReader, path::Path};
-
-pub fn sha1_file<P: AsRef<Path>>(path: P) -> (String, Vec<u8>) {
-    let content = fs::read_to_string(path).unwrap();
-    println!("{}", content);
-    let mut hasher = Sha1::new();
-
-    // process input message
-    hasher.update(format!("blob {}\0", content.len()));
-    hasher.update(&content);
-    let result = hasher.finalize();
-
-    (content, result[..].to_owned())
-}
+use std::{io::BufReader, path::Path};
 
 pub fn encode_file<P: AsRef<Path>>(path: P) -> Vec<u8> {
     use flate2::bufread::ZlibEncoder;
-    use std::io::prelude::*;
+
     let file = std::fs::File::open(path).unwrap();
     let b = BufReader::new(file);
     let mut z = ZlibEncoder::new(b, Compression::fast());
@@ -39,8 +24,18 @@ pub fn encode(content: Vec<u8>) -> Vec<u8> {
 }
 
 pub fn decode_file<P: AsRef<Path>>(path: P) -> Vec<u8> {
-    use std::io::prelude::*;
+    use flate2::bufread::ZlibDecoder;
+
     let bytes = std::fs::read(path).unwrap();
+    let mut deflater = ZlibDecoder::new(&bytes[..]);
+    let mut reader = Vec::new();
+    deflater.read_to_end(&mut reader).unwrap();
+    reader
+}
+
+pub fn decode(bytes: Vec<u8>) -> Vec<u8> {
+    use flate2::bufread::ZlibDecoder;
+
     let mut deflater = ZlibDecoder::new(&bytes[..]);
     let mut reader = Vec::new();
     deflater.read_to_end(&mut reader).unwrap();
