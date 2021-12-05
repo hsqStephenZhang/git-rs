@@ -25,3 +25,6 @@ thiserror = "1.0"
 
 # file system
 walkdir = "2"
+
+# other utils
+lazy_static = "1.4.0"

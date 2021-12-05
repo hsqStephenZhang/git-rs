@@ -1,13 +1,14 @@
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take, take_till},
+    bytes::complete::{tag, take, take_till, take_while},
     error::{Error, ParseError},
-    multi::many0,
+    multi::{many0, many_m_n},
     sequence::tuple,
     IResult, Parser,
 };
 
 use crate::{
+    index::{self, Index, IndexEntry},
     object::{
         commit::{AuthorInfo, Commit, CommitterInfo},
         Blob, Object, Tree, TreeEntry,
@@ -139,6 +140,87 @@ fn decode_commit<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&[u8
     Ok(("".as_bytes(), Object::Commit(commit)))
 }
 
+fn decode_index_entry<'a, E: ParseError<&'a [u8]>>(
+    content: &'a [u8],
+) -> IResult<&'a [u8], IndexEntry, E> {
+    use nom::number::complete::u16 as p_u16;
+    let p_u16 = p_u16(nom::number::Endianness::Big);
+    use nom::number::complete::u32 as p_u32;
+    let p_u32 = p_u32(nom::number::Endianness::Big);
+
+    // use nom::number::complete::u64 as p_u64;
+    // let p_u64 = p_u64(nom::number::Endianness::Big);
+
+    use nom::number::complete::i64 as p_i64;
+    let p_i64 = p_i64(nom::number::Endianness::Big);
+
+    let mut parser = tuple((
+        p_i64,
+        p_i64,
+        p_u32,
+        p_u32,
+        p_u32,
+        p_u32,
+        p_u32,
+        p_u32,
+        take(20usize),
+        p_u16,
+    ));
+
+    let (content, (ctime, mtime, dev, kino, mode, uid, gid, files, hex, flags)) = parser(content)?;
+
+    let (content, filepath) = take_till(|c| c == b'\0')(content)?;
+    let (content, padding) = take_while(|c| c == b'\0')(content)?;
+
+    let entry = IndexEntry::new(
+        ctime,
+        mtime,
+        dev,
+        kino,
+        mode,
+        uid,
+        gid,
+        files,
+        hex.into(),
+        flags,
+        filepath.into(),
+        padding.len(),
+    );
+
+    Ok((content, entry))
+}
+
+fn decode_index_extension<'a, E: ParseError<&'a [u8]>>(
+    content: &'a [u8],
+) -> IResult<&'a [u8], index::Extension, E> {
+    // let tree = tag(b"TREE");
+
+    todo!()
+}
+
+pub fn decode_index<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&'a [u8], Index, E> {
+    use nom::number::complete::u32 as p_u32;
+    let p_u32 = p_u32(nom::number::Endianness::Big);
+    let mut parser = tuple((p_u32, p_u32, p_u32));
+    let (content, (dirc, version, num_entrys)) = parser(content)?;
+
+    let mut entrys = many_m_n(num_entrys as usize, num_entrys as usize, decode_index_entry);
+    let hex_parser = take(20usize);
+
+    let (content, entrys) = entrys(content)?;
+
+    let (content, extension, hex) = if content.len() >= 4 && &content[..4] == b"TREE" {
+        // TODO: parse extension and hex
+        (content, None, &b""[..])
+    } else {
+        let (content, hex) = hex_parser(content)?;
+        (content, None, hex)
+    };
+
+    let index = Index::new(dirc, version, num_entrys, entrys, hex.into(), extension);
+    Ok((content, index))
+}
+
 #[cfg(test)]
 mod tests {
     use nom::{AsBytes, IResult};
@@ -148,7 +230,7 @@ mod tests {
         utils::sha1::decode_file,
     };
 
-    use super::decode_blob;
+    use super::{decode_blob, decode_index};
 
     #[test]
     fn test_blob_decode_encode() {
@@ -195,5 +277,15 @@ mod tests {
         // println!("encode :{:?}", r);
 
         assert_eq!(content, &r[..]);
+    }
+
+    #[test]
+    fn test_decode_index() {
+        let content = std::fs::read("data/index").unwrap();
+        let content = content.as_bytes();
+
+        let r: IResult<_, _> = decode_index(content);
+        let (_, index) = r.unwrap();
+        println!("{:?}", index);
     }
 }
