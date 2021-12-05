@@ -1,15 +1,16 @@
 pub mod commands;
+pub mod context;
 pub mod db;
 pub mod diff;
 pub mod error;
-pub mod filecache;
 pub mod index;
 pub mod object;
 pub mod parser;
+#[allow(warnings)]
+pub mod repository;
 pub mod tree;
 pub mod utils;
 
-pub use filecache::*;
 use commands::Git;
 use structopt::StructOpt;
 
@@ -18,9 +19,6 @@ use structopt::StructOpt;
 extern crate log;
 extern crate simplelog;
 use simplelog::*;
-
-#[macro_use]
-extern crate lazy_static;
 
 pub const APP_NAME: &'static str = "git-rs";
 pub const REPO_NAME: &'static str = ".git-rs";

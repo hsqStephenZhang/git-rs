@@ -10,7 +10,7 @@ pub struct Index {
     pub num_entrys: u32,
     pub entrys: Vec<IndexEntry>,
     pub checksum: Vec<u8>,
-    pub extension: Option<Extension>,
+    pub extensions: Option<Vec<Extension>>,
 }
 
 impl Index {
@@ -20,7 +20,7 @@ impl Index {
         num_entrys: u32,
         entrys: Vec<IndexEntry>,
         checksum: Vec<u8>,
-        extension: Option<Extension>,
+        extensions: Option<Vec<Extension>>,
     ) -> Self {
         Self {
             desc,
@@ -28,7 +28,7 @@ impl Index {
             num_entrys,
             entrys,
             checksum,
-            extension,
+            extensions,
         }
     }
 }
@@ -92,15 +92,17 @@ impl IndexEntry {
         let gid = meta.st_gid();
         let filesize = meta.st_size() as u32;
 
-        let sha1 = crate::SHA_CACHE.lock().unwrap();
-        let cached = sha1.get(&path);
-        let mut sha1 = match cached {
-            Some(cached) => cached.clone(),
-            None => {
-                let bytes = std::fs::read(&path).unwrap();
-                bytes
-            }
-        };
+        // let sha1 = crate::SHA_CACHE.lock().unwrap();
+        // let cached = sha1.get(&path);
+        // let mut sha1 = match cached {
+        //     Some(cached) => cached.clone(),
+        //     None => {
+        //         let bytes = std::fs::read(&path).unwrap();
+        //         bytes
+        //     }
+        // };
+        // FIXME: should get the sha1 not the raw bytes
+        let mut sha1 = std::fs::read(&path).unwrap();
         sha1.push(b'\0');
         let filepath = path.into_os_string().into_vec();
         // FIXME: flags should be split into high and low bits, we ignore high bits here
@@ -134,10 +136,16 @@ impl IndexEntry {
 }
 
 #[derive(Clone, Debug)]
-pub struct Extension {
-    entry_count: usize,
-    subtree_count: usize,
-    sha1: Vec<u8>,
+pub enum Extension {
+    Tree(Tree),
+}
+
+#[derive(Clone, Debug)]
+pub struct Tree {
+    pub entry_count: usize,
+    pub subtree_count: usize,
+    pub sha1: Vec<u8>,
+    pub children: Option<Vec<Tree>>,
 }
 
 #[cfg(test)]

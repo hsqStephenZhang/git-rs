@@ -3,7 +3,7 @@ use nom::{
     bytes::complete::{tag, take, take_till, take_while},
     error::{Error, ParseError},
     multi::{many0, many_m_n},
-    sequence::tuple,
+    sequence::{delimited, preceded, tuple},
     IResult, Parser,
 };
 
@@ -140,7 +140,7 @@ fn decode_commit<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&[u8
     Ok(("".as_bytes(), Object::Commit(commit)))
 }
 
-fn decode_index_entry<'a, E: ParseError<&'a [u8]>>(
+pub fn decode_index_entry<'a, E: ParseError<&'a [u8]>>(
     content: &'a [u8],
 ) -> IResult<&'a [u8], IndexEntry, E> {
     use nom::number::complete::u16 as p_u16;
@@ -190,35 +190,51 @@ fn decode_index_entry<'a, E: ParseError<&'a [u8]>>(
     Ok((content, entry))
 }
 
-fn decode_index_extension<'a, E: ParseError<&'a [u8]>>(
+pub fn decode_tree_extension<'a, E: ParseError<&'a [u8]>>(
     content: &'a [u8],
 ) -> IResult<&'a [u8], index::Extension, E> {
-    // let tree = tag(b"TREE");
+    use nom::number::complete::u32 as p_u32;
+    let p_u32 = p_u32(nom::number::Endianness::Big);
+    let tree = tag(b"TREE");
+    let length = p_u32;
+    let path = take_till(|c| c == b'\0');
+    let entry_num = preceded(tag(b"\0"), take_till(|c| c == b' '));
+    let subtree_num = delimited(tag(b" "), take_till(|c| c == b'\n'), tag(b"\n"));
+
+    let (_content, r) = tuple((tree, length, path, entry_num, subtree_num))(content)?;
+
+    dbg!(r);
 
     todo!()
 }
 
-pub fn decode_index<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&'a [u8], Index, E> {
-    use nom::number::complete::u32 as p_u32;
-    let p_u32 = p_u32(nom::number::Endianness::Big);
-    let mut parser = tuple((p_u32, p_u32, p_u32));
-    let (content, (dirc, version, num_entrys)) = parser(content)?;
+pub fn decode_index<'a, E: ParseError<&'a [u8]>>(_content: &'a [u8]) -> IResult<&'a [u8], Index, E> {
+    // use nom::number::complete::u32 as p_u32;
+    // let p_u32 = p_u32(nom::number::Endianness::Big);
+    // let mut parser = tuple((p_u32, p_u32, p_u32));
+    // let (content, (dirc, version, num_entrys)) = parser(content)?;
 
-    let mut entrys = many_m_n(num_entrys as usize, num_entrys as usize, decode_index_entry);
-    let hex_parser = take(20usize);
+    // let mut entrys = many_m_n(num_entrys as usize, num_entrys as usize, decode_index_entry);
+    // let hex_parser = take(20usize);
 
-    let (content, entrys) = entrys(content)?;
+    // let (content, entrys) = entrys(content)?;
 
-    let (content, extension, hex) = if content.len() >= 4 && &content[..4] == b"TREE" {
-        // TODO: parse extension and hex
-        (content, None, &b""[..])
-    } else {
-        let (content, hex) = hex_parser(content)?;
-        (content, None, hex)
-    };
+    // let mut extensions = vec![];
 
-    let index = Index::new(dirc, version, num_entrys, entrys, hex.into(), extension);
-    Ok((content, index))
+    // let (content, extension, hex) = if content.len() >= 4 && &content[..4] == b"TREE" {
+    //     // TODO: parse extension and hex
+    //     (content, None, &b""[..])
+    // } else {
+    //     let (content, hex) = hex_parser(content)?;
+    //     (content, None, hex)
+    // };
+
+    // let tree_extension_parser = decode_tree_extension;
+    
+
+    // let index = Index::new(dirc, version, num_entrys, entrys, hex.into(), extensions);
+    // Ok((content, index))
+    todo!()
 }
 
 #[cfg(test)]
