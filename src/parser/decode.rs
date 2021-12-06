@@ -276,6 +276,7 @@ mod tests {
 
         let r: IResult<_, _> = decode_blob(content);
         let (_, obj) = r.unwrap();
+        dbg!(&obj);
 
         let r: Vec<u8> = Into::into(&obj);
         // println!("encode:{:?}", r);
@@ -283,6 +284,7 @@ mod tests {
         assert_eq!(content, &r[..]);
     }
 
+    
     #[test]
     fn test_tree_decode_encode() {
         // 8465cd187d9bad9e5a7931c2119f16311f9923a7
@@ -292,6 +294,24 @@ mod tests {
 
         let r: IResult<_, _> = decode_tree(content);
         let (_, obj) = r.unwrap();
+        dbg!(&obj);
+
+        let r: Vec<u8> = Into::into(&obj);
+        // println!("encode:{:?}", r);
+
+        assert_eq!(content, &r[..]);
+    }
+
+    #[test]
+    fn test_tree_decode_encode2() {
+        //3bf04fcd182b02137c1d0e9946a2c77ec9ac1164
+        let content = decode_file("data/objects/3b/f04fcd182b02137c1d0e9946a2c77ec9ac1164");
+        let content = content.as_bytes();
+        // println!("content:{:?}\n\n", content);
+
+        let r: IResult<_, _> = decode_tree(content);
+        let (_, obj) = r.unwrap();
+        dbg!(&obj);
 
         let r: Vec<u8> = Into::into(&obj);
         // println!("encode:{:?}", r);
@@ -308,6 +328,25 @@ mod tests {
 
         let r: IResult<_, _> = decode_commit(content);
         let (_, obj) = r.unwrap();
+        dbg!(&obj);
+
+        let r: Vec<u8> = Into::into(&obj);
+        // println!("encode :{:?}", r);
+
+        assert_eq!(content, &r[..]);
+    }
+
+    #[test]
+    fn test_commit_decode_encode2() {
+        // 6f4f12edec17b6c97795f14fe703fc680111ad83
+        let content = decode_file("data/objects/6f/4f12edec17b6c97795f14fe703fc680111ad83");
+        let content = content.as_bytes();
+        // println!("content:{:?}\n\n", content);
+
+        let r: IResult<_, _> = decode_commit(content);
+        let (_, obj) = r.unwrap();
+
+        dbg!(&obj);
 
         let r: Vec<u8> = Into::into(&obj);
         // println!("encode :{:?}", r);
