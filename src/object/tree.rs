@@ -1,7 +1,7 @@
 use bytes::{BufMut, BytesMut};
 use nom::AsBytes;
 
-use crate::utils::bytes::hex_to_bytes;
+use crate::utils::bytes::double_hex_to_bytes;
 
 use super::ObjectMode;
 
@@ -51,7 +51,7 @@ impl Into<Vec<u8>> for &Tree {
             entry_buf.put_u8(b' ');
             entry_buf.put(entry.filename.as_bytes());
             entry_buf.put_u8(b'\0');
-            entry_buf.put(hex_to_bytes(entry.sha1.as_bytes()).as_bytes());
+            entry_buf.put(double_hex_to_bytes(entry.sha1.as_bytes()).as_bytes());
         }
         // tree<space><content length><NULL><content>
         // here, content is the entry buf

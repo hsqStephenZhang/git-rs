@@ -1,8 +1,8 @@
 use std::fs;
-#[cfg(target_os = "macos")]
-use std::os::macos::fs::MetadataExt;
 #[cfg(target_os = "linux")]
 use std::os::linux::fs::MetadataExt;
+#[cfg(target_os = "macos")]
+use std::os::macos::fs::MetadataExt;
 use std::os::unix::prelude::OsStringExt;
 use std::path::PathBuf;
 
@@ -12,8 +12,8 @@ pub struct Index {
     pub version: u32,
     pub num_entrys: u32,
     pub entrys: Vec<IndexEntry>,
+    pub extensions: Vec<Extension>, // recursive, layer first structure
     pub checksum: Vec<u8>,
-    pub extensions: Option<Vec<Extension>>,
 }
 
 impl Index {
@@ -23,7 +23,7 @@ impl Index {
         num_entrys: u32,
         entrys: Vec<IndexEntry>,
         checksum: Vec<u8>,
-        extensions: Option<Vec<Extension>>,
+        extensions:Vec<Extension>,
     ) -> Self {
         Self {
             desc,
@@ -136,10 +136,23 @@ pub enum Extension {
 
 #[derive(Clone, Debug)]
 pub struct Tree {
-    pub entry_count: usize,
-    pub subtree_count: usize,
-    pub sha1: Vec<u8>,
-    pub children: Option<Vec<Tree>>,
+    pub path:String,
+    pub entry_num: i32,
+    pub subtree_num: i32,
+    pub sha1:Option<Vec<u8>>,
+    pub children: Vec<Tree>,
+}
+
+impl Tree {
+    pub fn new(path:String,entry_num: i32, subtree_num: i32,  sha1:Option<Vec<u8>>,children: Vec<Tree>) -> Self {
+        Self {
+            path,
+            entry_num,
+            subtree_num,
+            sha1,
+            children,
+        }
+    }
 }
 
 #[cfg(test)]

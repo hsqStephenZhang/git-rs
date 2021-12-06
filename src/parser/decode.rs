@@ -1,8 +1,8 @@
 use nom::{
     branch::alt,
     bytes::complete::{tag, take, take_till, take_while},
-    error::{Error, ParseError},
-    multi::many0,
+    error::ParseError,
+    multi::{many0, many_m_n},
     sequence::{delimited, preceded, terminated, tuple},
     IResult, Parser,
 };
@@ -13,13 +13,12 @@ use crate::{
         commit::{AuthorInfo, Commit, CommitterInfo},
         Blob, Object, Tree, TreeEntry,
     },
-    utils::bytes::{bytes_to_hex, bytes_to_string, bytes_to_usize},
+    utils::bytes::{bytes_to_hex, bytes_to_string, bytes_to_usize, hex_to_i32},
 };
 
-pub fn decode(content: &[u8]) -> Result<Object, nom::Err<Error<&[u8]>>> {
+pub fn decode<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&[u8], Object, E> {
     let mut parser = alt((decode_blob, decode_tree, decode_commit));
-    let r = parser.parse(content)?;
-    Ok(r.1)
+    Ok(parser.parse(content)?)
 }
 
 fn decode_blob<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&[u8], Object, E> {
@@ -181,45 +180,81 @@ pub fn decode_tree_extension<'a, E: ParseError<&'a [u8]>>(
     let p_u32 = p_u32(nom::number::Endianness::Big);
     let tree = tag(b"TREE");
     let length = p_u32;
-    let path = take_till(|c| c == b'\0');
-    let entry_num = preceded(tag(b"\0"), take_till(|c| c == b' '));
-    let subtree_num = delimited(tag(b" "), take_till(|c| c == b'\n'), tag(b"\n"));
 
-    let (_content, r) = tuple((tree, length, path, entry_num, subtree_num))(content)?;
+    // ignore the content length here
+    let (content, (_tree, _, root)) =
+        tuple((tree, length, decode_tree_extension_subtree))(content)?;
 
-    dbg!(r);
-
-    todo!()
+    return Ok((content, index::Extension::Tree(root)));
 }
 
-pub fn decode_index<'a, E: ParseError<&'a [u8]>>(
-    _content: &'a [u8],
-) -> IResult<&'a [u8], Index, E> {
-    // use nom::number::complete::u32 as p_u32;
-    // let p_u32 = p_u32(nom::number::Endianness::Big);
-    // let mut parser = tuple((p_u32, p_u32, p_u32));
-    // let (content, (dirc, version, num_entrys)) = parser(content)?;
+pub fn decode_tree_extension_subtree<'a, E: ParseError<&'a [u8]>>(
+    content: &'a [u8],
+) -> IResult<&'a [u8], index::Tree, E> {
+    let path = take_till(|c| c == b'\0');
+    let entry_num_parser = preceded(tag(b"\0"), take_till(|c| c == b' '));
+    let subtree_num_parser = delimited(tag(b" "), take_till(|c| c == b'\n'), tag(b"\n"));
+    let mut tree_meta_parser = tuple((path, entry_num_parser, subtree_num_parser));
+    let (mut content, (path, entry_num, subtree_num)) = tree_meta_parser(content)?;
 
-    // let mut entrys = many_m_n(num_entrys as usize, num_entrys as usize, decode_index_entry);
-    // let hex_parser = take(20usize);
+    let path = String::from_utf8(path.to_owned()).unwrap();
+    let entry_num = hex_to_i32(entry_num);
+    let subtree_num = hex_to_i32(subtree_num);
 
-    // let (content, entrys) = entrys(content)?;
+    let mut subtrees = Vec::with_capacity(subtree_num as usize);
 
-    // let mut extensions = vec![];
+    for _ in 0..subtree_num as usize {
+        let (__content, subtree) = decode_tree_extension_subtree(content)?;
+        content = __content;
+        subtrees.push(subtree);
+    }
 
-    // let (content, extension, hex) = if content.len() >= 4 && &content[..4] == b"TREE" {
-    //     // TODO: parse extension and hex
-    //     (content, None, &b""[..])
-    // } else {
-    //     let (content, hex) = hex_parser(content)?;
-    //     (content, None, hex)
-    // };
+    let (content, hex) = if entry_num != -1 {
+        let hex_parser = take(20usize);
+        let (content, hex) = hex_parser(content)?;
+        (content, Some(hex.to_owned()))
+    } else {
+        (content, None)
+    };
 
-    // let tree_extension_parser = decode_tree_extension;
+    return Ok((
+        content,
+        index::Tree::new(path, entry_num, subtree_num, hex, subtrees),
+    ));
+}
 
-    // let index = Index::new(dirc, version, num_entrys, entrys, hex.into(), extensions);
-    // Ok((content, index))
-    todo!()
+pub fn decode_index<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&'a [u8], Index, E> {
+    use nom::number::complete::u32 as p_u32;
+    let p_u32 = p_u32(nom::number::Endianness::Big);
+    let mut parser = tuple((p_u32, p_u32, p_u32));
+    let (content, (dirc, version, num_entrys)) = parser(content)?;
+
+    let mut entrys_parser = many_m_n(num_entrys as usize, num_entrys as usize, decode_index_entry);
+    let checksum_parser = take(20usize);
+
+    let (content, entrys) = entrys_parser(content)?;
+
+    let mut extensions = Vec::new();
+
+    let content = if content.len() >= 4 && &content[..4] == b"TREE" {
+        let (content, tree_extension) = decode_tree_extension(content)?;
+        extensions.push(tree_extension);
+        content
+    } else {
+        content
+    };
+
+    let (content, checksum) = checksum_parser(content)?;
+
+    let index = Index::new(
+        dirc,
+        version,
+        num_entrys,
+        entrys,
+        checksum.into(),
+        extensions,
+    );
+    Ok((content, index))
 }
 
 #[cfg(test)]
@@ -236,7 +271,7 @@ mod tests {
     #[test]
     fn test_blob_decode_encode() {
         // 3b18e512dba79e4c8300dd08aeb37f8e728b8dad
-        let content = decode_file(".git/objects/3b/18e512dba79e4c8300dd08aeb37f8e728b8dad");
+        let content = decode_file("data/objects/3b/18e512dba79e4c8300dd08aeb37f8e728b8dad");
         let content = content.as_bytes();
 
         let r: IResult<_, _> = decode_blob(content);
@@ -251,7 +286,7 @@ mod tests {
     #[test]
     fn test_tree_decode_encode() {
         // 8465cd187d9bad9e5a7931c2119f16311f9923a7
-        let content = decode_file(".git/objects/84/65cd187d9bad9e5a7931c2119f16311f9923a7");
+        let content = decode_file("data/objects/84/65cd187d9bad9e5a7931c2119f16311f9923a7");
         let content = content.as_bytes();
         // println!("content:{:?}\n\n", content);
 
@@ -267,7 +302,7 @@ mod tests {
     #[test]
     fn test_commit_decode_encode() {
         // ef074b7c01f72b2a16eea122c90035ff7649d855
-        let content = decode_file(".git/objects/ef/074b7c01f72b2a16eea122c90035ff7649d855");
+        let content = decode_file("data/objects/ef/074b7c01f72b2a16eea122c90035ff7649d855");
         let content = content.as_bytes();
         // println!("content:{:?}\n\n", content);
 
@@ -286,7 +321,17 @@ mod tests {
         let content = content.as_bytes();
 
         let r: IResult<_, _> = decode_index(content);
-        let (_, index) = r.unwrap();
-        println!("{:?}", index);
+        let r = r.unwrap();
+        println!("{:?}", r);
+    }
+
+    #[test]
+    fn test_decode_index2() {
+        let content = std::fs::read("data/index2").unwrap();
+        let content = content.as_bytes();
+
+        let r: IResult<_, _> = decode_index(content);
+        let r = r.unwrap();
+        println!("{:?}", r);
     }
 }

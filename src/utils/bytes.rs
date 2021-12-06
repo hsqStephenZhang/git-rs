@@ -7,27 +7,23 @@ pub fn bytes_to_hex(raw: &[u8]) -> String {
         .join("")
 }
 
-pub fn hex_to_bytes(hex: &[u8]) -> Vec<u8> {
+#[inline(always)]
+pub fn byte_to_num(a: u8) -> u8 {
+    if a >= b'a' {
+        a - b'a' + 10
+    } else if a >= b'A' {
+        a - b'A' + 10
+    } else {
+        a - b'0'
+    }
+}
+
+pub fn double_hex_to_bytes(hex: &[u8]) -> Vec<u8> {
     hex.windows(2)
         .step_by(2)
         .map(|v| {
-            let a = v[0];
-            let b = v[1];
-            let v1 = if a >= b'a' {
-                a - b'a' + 10
-            } else if a >= b'A' {
-                a - b'A' + 10
-            } else {
-                a - b'0'
-            };
-
-            let v2 = if b >= b'a' {
-                b - b'a' + 10
-            } else if b >= b'A' {
-                b - b'A' + 10
-            } else {
-                b - b'0'
-            };
+            let v1 = byte_to_num(v[0]);
+            let v2 = byte_to_num(v[1]);
 
             v1 * 16 + v2
         })
@@ -48,11 +44,25 @@ pub fn bytes_to_usize(raw: &[u8]) -> usize {
     res
 }
 
+pub fn hex_to_i32(raw: &[u8]) -> i32 {
+    if raw[0] == b'-' {
+        return -1
+    }
+    let mut res = 0;
+    raw.iter().for_each(|&v| {
+        res = res * 10 + byte_to_num(v) as i32;
+    });
+
+    res
+}
+
 #[cfg(test)]
 mod tests {
+    use nom::AsBytes;
+
     use crate::utils::bytes::bytes_to_string;
 
-    use super::{bytes_to_hex, bytes_to_usize};
+    use super::{bytes_to_hex, bytes_to_usize, hex_to_i32};
 
     #[test]
     fn t1() {
@@ -79,5 +89,16 @@ mod tests {
         let raw = &[50, 52, 55]; // 247
         let size = bytes_to_usize(raw);
         assert_eq!(size, 247);
+    }
+
+    #[test]
+    fn t3() {
+        let a = &[b'1', b'2', b'3'];
+        let r = hex_to_i32(a.as_bytes());
+        assert_eq!(r, 123);
+
+        let a = &[b'-', b'1', b'2', b'3'];
+        let r = hex_to_i32(a.as_bytes());
+        assert_eq!(r, -1);
     }
 }
