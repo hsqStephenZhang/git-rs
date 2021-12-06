@@ -1,4 +1,7 @@
 use std::fs;
+#[cfg(target_os = "macos")]
+use std::os::macos::fs::MetadataExt;
+#[cfg(target_os = "linux")]
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::prelude::OsStringExt;
 use std::path::PathBuf;
@@ -92,15 +95,6 @@ impl IndexEntry {
         let gid = meta.st_gid();
         let filesize = meta.st_size() as u32;
 
-        // let sha1 = crate::SHA_CACHE.lock().unwrap();
-        // let cached = sha1.get(&path);
-        // let mut sha1 = match cached {
-        //     Some(cached) => cached.clone(),
-        //     None => {
-        //         let bytes = std::fs::read(&path).unwrap();
-        //         bytes
-        //     }
-        // };
         // FIXME: should get the sha1 not the raw bytes
         let mut sha1 = std::fs::read(&path).unwrap();
         sha1.push(b'\0');
