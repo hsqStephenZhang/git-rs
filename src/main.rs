@@ -1,13 +1,14 @@
 pub mod commands;
 pub mod context;
+#[allow(warnings)]
+pub mod core;
 pub mod db;
 pub mod diff;
 pub mod error;
 pub mod index;
 pub mod object;
 pub mod parser;
-#[allow(warnings)]
-pub mod core;
+pub mod refs;
 pub mod tree;
 pub mod utils;
 
