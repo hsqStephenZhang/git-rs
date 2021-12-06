@@ -2,8 +2,8 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take, take_till, take_while},
     error::{Error, ParseError},
-    multi::{many0, many_m_n},
-    sequence::{delimited, preceded, tuple},
+    multi::many0,
+    sequence::{delimited, preceded, terminated, tuple},
     IResult, Parser,
 };
 
@@ -24,50 +24,33 @@ pub fn decode(content: &[u8]) -> Result<Object, nom::Err<Error<&[u8]>>> {
 
 fn decode_blob<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&[u8], Object, E> {
     let parser = tag("blob ".as_bytes());
-    // let r: IResult<_, _> = parser(content);
     let (content, _blob) = parser(content)?;
-
-    let parser = take_till(|c| c == b'\0');
-    let (content, size) = parser(content)?;
-    let content = &content[1..]; // skip '\0'
+    let (content, size) = terminated(take_till(|c| c == b'\0'), tag(b"\0"))(content)?;
 
     let size = bytes_to_usize(size);
-
     let blob = Blob::new(content[0..size].to_owned());
     Ok((content, Object::Blob(blob)))
 }
 
 fn decode_tree<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&[u8], Object, E> {
     let parser = tag("tree ".as_bytes());
-    // let r: IResult<_, _> = parser(content);
     let (content, _tree) = parser(content)?;
 
-    let parser = take_till(|c| c == b'\0');
-    let (content, _size) = parser(content)?;
-    let content = &content[1..]; // skip '\0'
+    let (content, _size) = terminated(take_till(|c| c == b'\0'), tag(b"\0"))(content)?;
 
-    let mode_parser = take(6usize);
-    let nop = tag(b" ");
-    let name_parser = take_till(|c| c == b'\0');
-    let nop2 = tag(b"\0");
+    let mode_parser = take_till(|c| c == b' ');
+    let name_parser = delimited(tag(b" "), take_till(|c| c == b'\0'), tag(b"\0"));
     let hex_paser = take(20usize);
 
-    let entry_parser = tuple((mode_parser, nop, name_parser, nop2, hex_paser));
-    let entry_parser2 = tuple((
-        tag(b"40000"),
-        tag(b" "),
-        take_till(|c| c == b'\0'),
-        tag(b"\0"),
-        take(20usize),
-    ));
-    let mut parser = many0(alt((entry_parser, entry_parser2)));
-    let (content, lines): (_, Vec<(&[u8], _, &[u8], _, &[u8])>) = parser(content)?;
+    let entry_parser = tuple((mode_parser, name_parser, hex_paser));
+    let mut parser = many0(entry_parser);
+    let (content, lines): (_, Vec<(&[u8], &[u8], &[u8])>) = parser(content)?;
+
     let mut entrys = Vec::with_capacity(lines.len());
-    for (mode, _, filename, _, hex) in lines {
+    for (mode, filename, hex) in lines {
         let mode = mode.into();
         let filename = bytes_to_string(filename);
         let hex = bytes_to_hex(hex);
-
         let child = TreeEntry::new(mode, hex, filename);
         entrys.push(child);
     }
@@ -78,33 +61,37 @@ fn decode_commit<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&[u8
     let parser = tag(b"commit ");
     let (content, _commit) = parser(content)?;
 
-    let parser = take_till(|c| c == b'\0');
-    let (content, _size) = parser(content)?;
-    let content = &content[1..]; // skip '\0'
+    let (content, _size) = terminated(take_till(|c| c == b'\0'), tag(b"\0"))(content)?;
 
-    let mut tree_parser = tuple((tag(b"tree"), tag(b" "), take(40usize), tag(b"\n")));
+    let mut tree_parser = tuple((
+        tag(b"tree"),
+        delimited(tag(b" "), take(40usize), tag(b"\n")),
+    ));
     let (content, tree_attr) = tree_parser(content)?;
 
-    let hex = tree_attr.2;
+    let hex = tree_attr.1;
     let root_sha1 = bytes_to_string(hex);
 
-    let parent_entry_parser = tuple((tag(b"parent"), tag(b" "), take(40usize), tag(b"\n")));
+    let parent_entry_parser = tuple((
+        tag(b"parent"),
+        delimited(tag(b" "), take(40usize), tag(b"\n")),
+    ));
     let mut parents_parser = many0(parent_entry_parser);
-    let (content, parent_attrs): (_, Vec<(&[u8], _, &[u8], _)>) = parents_parser(content)?;
+    let (content, parent_attrs): (_, Vec<(&[u8], &[u8])>) = parents_parser(content)?;
 
     let parents_sha1 = if parent_attrs.len() == 0 {
         None
     } else {
         let v = parent_attrs
             .iter()
-            .map(|(_, _, hex, _)| bytes_to_string(hex))
+            .map(|(_, hex)| bytes_to_string(hex))
             .collect();
         Some(v)
     };
 
     // author hsqStephenZhang <2250015961@qq.com> 1638597231 +0000\n
     // committer hsqStephenZhang <2250015961@qq.com> 1638597231 +0000\n\nadd tree parse test\n
-    // \nadd tree parse test\n
+    // \nmessage
 
     let raw_infos = bytes_to_string(content);
     let infos: Vec<_> = raw_infos.splitn(4, "\n").collect();
@@ -147,9 +134,6 @@ pub fn decode_index_entry<'a, E: ParseError<&'a [u8]>>(
     let p_u16 = p_u16(nom::number::Endianness::Big);
     use nom::number::complete::u32 as p_u32;
     let p_u32 = p_u32(nom::number::Endianness::Big);
-
-    // use nom::number::complete::u64 as p_u64;
-    // let p_u64 = p_u64(nom::number::Endianness::Big);
 
     use nom::number::complete::i64 as p_i64;
     let p_i64 = p_i64(nom::number::Endianness::Big);
@@ -208,7 +192,9 @@ pub fn decode_tree_extension<'a, E: ParseError<&'a [u8]>>(
     todo!()
 }
 
-pub fn decode_index<'a, E: ParseError<&'a [u8]>>(_content: &'a [u8]) -> IResult<&'a [u8], Index, E> {
+pub fn decode_index<'a, E: ParseError<&'a [u8]>>(
+    _content: &'a [u8],
+) -> IResult<&'a [u8], Index, E> {
     // use nom::number::complete::u32 as p_u32;
     // let p_u32 = p_u32(nom::number::Endianness::Big);
     // let mut parser = tuple((p_u32, p_u32, p_u32));
@@ -230,7 +216,6 @@ pub fn decode_index<'a, E: ParseError<&'a [u8]>>(_content: &'a [u8]) -> IResult<
     // };
 
     // let tree_extension_parser = decode_tree_extension;
-    
 
     // let index = Index::new(dirc, version, num_entrys, entrys, hex.into(), extensions);
     // Ok((content, index))

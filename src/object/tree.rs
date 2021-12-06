@@ -53,6 +53,8 @@ impl Into<Vec<u8>> for &Tree {
             entry_buf.put_u8(b'\0');
             entry_buf.put(hex_to_bytes(entry.sha1.as_bytes()).as_bytes());
         }
+        // tree<space><content length><NULL><content>
+        // here, content is the entry buf
 
         let entry_contents = &entry_buf[..];
         let length = entry_contents.len();

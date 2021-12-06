@@ -80,10 +80,6 @@ impl Into<Vec<u8>> for &Commit {
         entry_buf.put(self.root_sha1.as_bytes());
         entry_buf.put_u8(b'\n');
 
-        // dbg!(entry_buf.split());
-
-        // println!("{:?}\n\n",&entry_buf[..]);
-
         if let Some(ref parents) = self.parents_sha1 {
             for entry in parents.iter() {
                 entry_buf.put(&b"parent "[..]);
@@ -91,10 +87,6 @@ impl Into<Vec<u8>> for &Commit {
                 entry_buf.put_u8(b'\n');
             }
         }
-
-        // dbg!(entry_buf.split());
-
-        // println!("{:?}\n\n",&entry_buf[..]);
 
         if let Some(ref author_info)=self.author{
             entry_buf.put(&b"author "[..]);
@@ -109,8 +101,6 @@ impl Into<Vec<u8>> for &Commit {
             entry_buf.put_u8(b'\n');
         }
 
-        // dbg!(entry_buf.split());
-
         if let Some(ref committer_into)=self.author{
             entry_buf.put(&b"committer "[..]);
             entry_buf.put(committer_into.name.as_bytes());
@@ -123,12 +113,11 @@ impl Into<Vec<u8>> for &Commit {
             entry_buf.put(committer_into.time_zone.as_bytes());
             entry_buf.put_u8(b'\n');
         }
-
-        // dbg!(entry_buf.split());
         entry_buf.put_u8(b'\n');
         entry_buf.put(self.messsage.as_bytes());
 
-        // dbg!(entry_buf.split());
+        // commit<space><content length><NULL><content>
+        // here, content is the entry buf
 
         let entry_contents = &entry_buf[..];
         let length = entry_contents.len();
@@ -139,8 +128,5 @@ impl Into<Vec<u8>> for &Commit {
         buf.put_u8(b'\0');
         buf.put(entry_contents);
         (&buf[..]).into()
-        // Vec::new()
     }
 }
-
-// impl Commit{}

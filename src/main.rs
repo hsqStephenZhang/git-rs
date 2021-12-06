@@ -7,7 +7,7 @@ pub mod index;
 pub mod object;
 pub mod parser;
 #[allow(warnings)]
-pub mod repository;
+pub mod core;
 pub mod tree;
 pub mod utils;
 

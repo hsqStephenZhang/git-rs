@@ -32,17 +32,17 @@ pub fn hex_to_bytes(hex: &[u8]) -> Vec<u8> {
             v1 * 16 + v2
         })
         .collect()
-    // hex.into()
 }
 
 pub fn bytes_to_string(raw: &[u8]) -> String {
     raw.iter().map(|&v| v as char).collect::<String>()
 }
 
+// transfer 1234(0x31 0x32 0x33 0x34) into 1234
 pub fn bytes_to_usize(raw: &[u8]) -> usize {
     let mut res = 0;
     raw.iter().for_each(|&v| {
-        res = res * 10 + (v as usize - 48);
+        res = res * 10 + (v as usize - 0x30);
     });
 
     res
