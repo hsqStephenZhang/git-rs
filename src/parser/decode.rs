@@ -167,7 +167,7 @@ pub fn decode_index_entry<'a, E: ParseError<&'a [u8]>>(
         files,
         hex.into(),
         flags,
-        filepath.into(),
+        filepath.iter().map(|&v|v as char).collect(),
         padding.len(),
     );
 
@@ -176,7 +176,7 @@ pub fn decode_index_entry<'a, E: ParseError<&'a [u8]>>(
 
 pub fn decode_tree_extension<'a, E: ParseError<&'a [u8]>>(
     content: &'a [u8],
-) -> IResult<&'a [u8], index::Extension, E> {
+) -> IResult<&'a [u8], index::TreeExtension, E> {
     use nom::number::complete::u32 as p_u32;
     let p_u32 = p_u32(nom::number::Endianness::Big);
     let tree = tag(b"TREE");
@@ -186,12 +186,12 @@ pub fn decode_tree_extension<'a, E: ParseError<&'a [u8]>>(
     let (content, (_tree, _, root)) =
         tuple((tree, length, decode_tree_extension_subtree))(content)?;
 
-    return Ok((content, index::Extension::Tree(root)));
+    return Ok((content, root));
 }
 
 pub fn decode_tree_extension_subtree<'a, E: ParseError<&'a [u8]>>(
     content: &'a [u8],
-) -> IResult<&'a [u8], index::Tree, E> {
+) -> IResult<&'a [u8], index::TreeExtension, E> {
     let path = take_till(|c| c == b'\0');
     let entry_num_parser = preceded(tag(b"\0"), take_till(|c| c == b' '));
     let subtree_num_parser = delimited(tag(b" "), take_till(|c| c == b'\n'), tag(b"\n"));
@@ -220,7 +220,7 @@ pub fn decode_tree_extension_subtree<'a, E: ParseError<&'a [u8]>>(
 
     return Ok((
         content,
-        index::Tree::new(path, entry_num, subtree_num, hex, subtrees),
+        index::TreeExtension::new(path, entry_num, subtree_num, hex, subtrees),
     ));
 }
 
@@ -235,14 +235,11 @@ pub fn decode_index<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&
 
     let (content, entrys) = entrys_parser(content)?;
 
-    let mut extensions = Vec::new();
-
-    let content = if content.len() >= 4 && &content[..4] == b"TREE" {
+    let (content, tree_extension) = if content.len() >= 4 && &content[..4] == b"TREE" {
         let (content, tree_extension) = decode_tree_extension(content)?;
-        extensions.push(tree_extension);
-        content
+        (content, Some(tree_extension))
     } else {
-        content
+        (content, None)
     };
 
     let (content, checksum) = checksum_parser(content)?;
@@ -253,7 +250,7 @@ pub fn decode_index<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&
         num_entrys,
         entrys,
         checksum.into(),
-        extensions,
+        tree_extension,
     );
     Ok((content, index))
 }
@@ -427,6 +424,7 @@ mod tests {
         let r = r.unwrap();
         println!("{:?}", r);
     }
+
     #[test]
     fn test_decode_index3() {
         let content = std::fs::read(".git/index").unwrap();

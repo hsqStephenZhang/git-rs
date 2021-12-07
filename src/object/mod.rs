@@ -81,7 +81,7 @@ mod tests {
         let b = Blob::new(content);
         let object = Object::Blob(b);
         let uncompressed_content: Vec<u8> = Into::into(&object);
-        let content = sha1::encode(uncompressed_content);
+        let content = sha1::encode(&uncompressed_content);
 
         let target = vec![
             0x78, 0x01, 0x4B, 0xCA, 0xC9, 0x4F, 0x52, 0x30, 0x34, 0x62, 0xC8, 0x48, 0xCD, 0xC9,

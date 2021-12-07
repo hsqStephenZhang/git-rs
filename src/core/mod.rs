@@ -2,7 +2,10 @@ pub mod repository;
 pub mod stage;
 pub mod working_area;
 
-use std::{path::{Path, PathBuf}, fmt::Debug};
+use std::{
+    fmt::Debug,
+    path::{Path, PathBuf},
+};
 
 use walkdir::WalkDir;
 
@@ -27,6 +30,7 @@ pub enum Status {
     Untracked,
     Staged,
     Modified,
+    StagedAndModified, // the status of file in 3 trees differ from each other
     Committed,
 }
 
@@ -44,7 +48,10 @@ pub struct RawFile {
 
 impl Debug for RawFile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RawFile").field("name", &self.name).finish()
+        #[cfg(debug_content)]
+        return f.debug_struct("RawFile").field("name", &self.name).field("content", &self.content).finish();
+        #[cfg(not(debug_content))]
+        return f.debug_struct("RawFile").field("name", &self.name).finish();
     }
 }
 
@@ -56,7 +63,10 @@ pub struct Dir {
 
 impl Debug for Dir {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Dir").field("name", &self.name).field("children", &self.children).finish()
+        f.debug_struct("Dir")
+            .field("name", &self.name)
+            .field("children", &self.children)
+            .finish()
     }
 }
 

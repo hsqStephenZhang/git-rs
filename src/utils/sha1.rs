@@ -14,7 +14,7 @@ pub fn encode_file<P: AsRef<Path>>(path: P) -> Vec<u8> {
     buffer
 }
 
-pub fn encode(content: Vec<u8>) -> Vec<u8> {
+pub fn encode(content: &[u8]) -> Vec<u8> {
     use flate2::write::ZlibEncoder;
 
     let mut z = ZlibEncoder::new(Vec::new(), Compression::fast());
@@ -33,7 +33,7 @@ pub fn decode_file<P: AsRef<Path>>(path: P) -> Vec<u8> {
     reader
 }
 
-pub fn decode(bytes: Vec<u8>) -> Vec<u8> {
+pub fn decode(bytes: &[u8]) -> Vec<u8> {
     use flate2::bufread::ZlibDecoder;
 
     let mut deflater = ZlibDecoder::new(&bytes[..]);
@@ -49,32 +49,21 @@ mod tests {
 
     #[test]
     fn test_encode() {
-        let r = encode_file("data/hello.txt");
+        let r = include_bytes!("../../data/hello.txt");
         println!("{:x?}", &r);
     }
 
     #[test]
     fn test_decode_blob() {
-        let r = decode_file(".git/objects/3b/18e512dba79e4c8300dd08aeb37f8e728b8dad");
-        println!("{:x?}", &r);
-        assert_eq!(&r[..], "blob 12\0hello world\n".as_bytes());
-    }
-
-    #[test]
-    fn test_decode_commit() {
-        let r = decode_file(".git/objects/77/a98a3098531ee305c021302cd381386aa41bcd");
-        println!("{:x?}", &r);
-    }
-
-    #[test]
-    fn test_decode_tree() {
-        let r = decode_file(".git/objects/84/65cd187d9bad9e5a7931c2119f16311f9923a7");
-        println!("{:x?}", &r);
+        let r = include_bytes!("../../data/objects/3b/18e512dba79e4c8300dd08aeb37f8e728b8dad");
+        let res  = decode(&r[..]);
+        assert_eq!(&res[..], "blob 12\0hello world\n".as_bytes());
     }
 
     #[test]
     fn test_sha_name() {
-        let r = encode_file("data/hello.txt");
-        println!("{:x?}", &r);
+        let r = include_bytes!("../../data/hello.txt");
+        let r=encode(&r[..]);
+        assert_eq!(r,vec![0x78, 0x1, 0xcb, 0x48, 0xcd, 0xc9, 0xc9, 0x57, 0x28, 0xcf, 0x2f, 0xca, 0x49, 0xe1, 0x2, 0x0, 0x1e, 0x72, 0x4, 0x67]);
     }
 }

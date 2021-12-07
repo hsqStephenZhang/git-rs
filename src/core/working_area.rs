@@ -47,7 +47,6 @@ pub fn add_child(path: &PathBuf) -> File {
     }
 }
 
-
 #[cfg(test)]
 mod tests{
 

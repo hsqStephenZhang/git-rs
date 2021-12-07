@@ -2,7 +2,6 @@ pub mod commands;
 pub mod context;
 #[allow(warnings)]
 pub mod core;
-pub mod db;
 pub mod diff;
 mod error;
 pub mod index;

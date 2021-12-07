@@ -19,7 +19,6 @@ pub struct GitContext {
     pub head: String,
     pub repo: Object,
     pub index: Index,
-    pub workdspace: WorkdSpace,
 }
 
 impl GitContext {
@@ -62,24 +61,5 @@ impl GitContext {
         dbg!(&index);
 
         todo!()
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct WorkdSpace{
-    
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use super::*;
-
-    #[test]
-    fn test_build_context() {
-        let path: Box<Path> = Path::new(".").into();
-        let git_context = GitContext::try_new(path.into_path_buf());
-        dbg!(&git_context);
     }
 }

@@ -1,10 +1,12 @@
+use std::collections::HashMap;
 use std::fs;
 #[cfg(target_os = "linux")]
 use std::os::linux::fs::MetadataExt;
 #[cfg(target_os = "macos")]
 use std::os::macos::fs::MetadataExt;
-use std::os::unix::prelude::OsStringExt;
 use std::path::PathBuf;
+
+use crate::core::working_area::WorkingArea;
 
 #[derive(Clone, Debug)]
 pub struct Index {
@@ -12,7 +14,7 @@ pub struct Index {
     pub version: u32,
     pub num_entrys: u32,
     pub entrys: Vec<IndexEntry>,
-    pub extensions: Vec<Extension>, // recursive, layer first structure
+    pub tree_extension: Option<TreeExtension>, // recursive, layer first structure
     pub checksum: Vec<u8>,
 }
 
@@ -23,7 +25,7 @@ impl Index {
         num_entrys: u32,
         entrys: Vec<IndexEntry>,
         checksum: Vec<u8>,
-        extensions:Vec<Extension>,
+        tree_extension: Option<TreeExtension>,
     ) -> Self {
         Self {
             desc,
@@ -31,8 +33,26 @@ impl Index {
             num_entrys,
             entrys,
             checksum,
-            extensions,
+            tree_extension,
         }
+    }
+
+    pub fn entry_map(&self) -> HashMap<PathBuf, Vec<u8>> {
+        self.entrys
+            .iter()
+            .map(|v| {
+                let path: String = v.filepath.clone();
+                (PathBuf::from(path), v.sha1.clone())
+            })
+            .collect()
+    }
+
+    pub fn compare_working_area(&self, _working_area: &WorkingArea) {
+        todo!()
+    }
+
+    pub fn invalid_nodes(&self) {
+        todo!()
     }
 }
 
@@ -48,7 +68,7 @@ pub struct IndexEntry {
     pub filesize: u32,
     pub sha1: Vec<u8>,
     pub flags: u16,
-    pub filepath: Vec<u8>,
+    pub filepath: String,
     pub padding: usize,
 }
 
@@ -65,7 +85,7 @@ impl IndexEntry {
         filesize: u32,
         sha1: Vec<u8>,
         flags: u16,
-        filepath: Vec<u8>,
+        filepath: String,
         padding: usize,
     ) -> IndexEntry {
         Self {
@@ -98,7 +118,7 @@ impl IndexEntry {
         // FIXME: should get the sha1 not the raw bytes
         let mut sha1 = std::fs::read(&path).unwrap();
         sha1.push(b'\0');
-        let filepath = path.into_os_string().into_vec();
+        let filepath:String = path.into_os_string().into_string().unwrap();
         // FIXME: flags should be split into high and low bits, we ignore high bits here
         let flags = if filepath.len() >= 0xFFF {
             0xFFF
@@ -130,21 +150,22 @@ impl IndexEntry {
 }
 
 #[derive(Clone, Debug)]
-pub enum Extension {
-    Tree(Tree),
-}
-
-#[derive(Clone, Debug)]
-pub struct Tree {
-    pub path:String,
+pub struct TreeExtension {
+    pub path: String,
     pub entry_num: i32,
     pub subtree_num: i32,
-    pub sha1:Option<Vec<u8>>,
-    pub children: Vec<Tree>,
+    pub sha1: Option<Vec<u8>>,
+    pub children: Vec<TreeExtension>,
 }
 
-impl Tree {
-    pub fn new(path:String,entry_num: i32, subtree_num: i32,  sha1:Option<Vec<u8>>,children: Vec<Tree>) -> Self {
+impl TreeExtension {
+    pub fn new(
+        path: String,
+        entry_num: i32,
+        subtree_num: i32,
+        sha1: Option<Vec<u8>>,
+        children: Vec<TreeExtension>,
+    ) -> Self {
         Self {
             path,
             entry_num,
@@ -153,11 +174,4 @@ impl Tree {
             children,
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-
-    #[test]
-    fn t1() {}
 }

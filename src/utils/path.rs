@@ -33,21 +33,8 @@ pub fn object_path(root_path:&PathBuf,name: &str) -> PathBuf
 mod tests {
     use super::*;
 
-    // we can only set current_dir once, otherwise the second shot will fail
     #[test]
     fn test1() {
-        use std::path::Path;
-
-        let dir=std::env::current_dir().unwrap();
-
-        let path = Path::new("data/src/test1");
-        std::env::set_current_dir(&path).unwrap();
-        let root = root_dir();
-        assert_eq!(root, Ok(dir));
-    }
-
-    #[test]
-    fn test2() {
         use std::path::Path;
 
         let path = Path::new("../");
