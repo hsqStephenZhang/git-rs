@@ -196,7 +196,7 @@ pub fn decode_tree_extension_subtree<'a, E: ParseError<&'a [u8]>>(
     let entry_num_parser = preceded(tag(b"\0"), take_till(|c| c == b' '));
     let subtree_num_parser = delimited(tag(b" "), take_till(|c| c == b'\n'), tag(b"\n"));
     let mut tree_meta_parser = tuple((path, entry_num_parser, subtree_num_parser));
-    let (mut content, (path, entry_num, subtree_num)) = tree_meta_parser(content)?;
+    let (content, (path, entry_num, subtree_num)) = tree_meta_parser(content)?;
 
     let path = String::from_utf8(path.to_owned()).unwrap();
     let entry_num = hex_to_i32(entry_num);
@@ -217,8 +217,6 @@ pub fn decode_tree_extension_subtree<'a, E: ParseError<&'a [u8]>>(
         content = __content;
         subtrees.push(subtree);
     }
-
-
 
     return Ok((
         content,
@@ -265,11 +263,12 @@ pub fn decode_index<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&
 pub fn decode_head_pointer<'a, E: ParseError<&'a [u8]>>(
     content: &'a [u8],
 ) -> IResult<&'a [u8], Head, E> {
-    let ref_parser =
-        tuple((tag(b"ref: "), take_till(|c| c == b'\0' || c == b'\n'))).map(|(_, res): (&[u8], &[u8])| {
+    let ref_parser = tuple((tag(b"ref: "), take_till(|c| c == b'\0' || c == b'\n'))).map(
+        |(_, res): (&[u8], &[u8])| {
             let s = String::from_utf8(res.into()).unwrap();
             Head::Ref(s)
-        });
+        },
+    );
     let sha1_parser = take(20usize).map(|res: &[u8]| Head::Pointer(res.into()));
 
     let mut head_parser = alt((ref_parser, sha1_parser));
@@ -282,7 +281,7 @@ mod tests {
     use nom::{AsBytes, IResult};
 
     use crate::{
-        parser::decode::{decode_commit, decode_tree, decode_object},
+        parser::decode::{decode_commit, decode_object, decode_tree},
         utils::sha1::decode_file,
     };
 
@@ -443,12 +442,12 @@ mod tests {
         // 2. 48b3d19840c917d8e5990ae629273a0a1cd2b606
         let content = &b"ref: refs/heads/master"[..];
         let r: IResult<_, _> = decode_head_pointer(content);
-        let (_,head)=r.unwrap();
-        println!("{:?}",head);
+        let (_, head) = r.unwrap();
+        println!("{:?}", head);
 
         let content = &b"48b3d19840c917d8e5990ae629273a0a1cd2b606"[..];
         let r: IResult<_, _> = decode_head_pointer(content);
-        let (_,head)=r.unwrap();
-        println!("{:?}",head);
+        let (_, head) = r.unwrap();
+        println!("{:?}", head);
     }
 }

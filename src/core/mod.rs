@@ -2,7 +2,7 @@ pub mod repository;
 pub mod stage;
 pub mod working_area;
 
-use std::path::Path;
+use std::{path::{Path, PathBuf}, fmt::Debug};
 
 use walkdir::WalkDir;
 
@@ -36,24 +36,36 @@ pub enum File {
     Dir(Dir),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct RawFile {
-    name: String,
-    content: Vec<u8>,
+    pub(crate) name: PathBuf,
+    pub(crate) content: Vec<u8>,
 }
 
-#[derive(Clone, Debug)]
+impl Debug for RawFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RawFile").field("name", &self.name).finish()
+    }
+}
+
+#[derive(Clone)]
 pub struct Dir {
-    name: String,
-    children: Option<Vec<File>>,
+    pub(crate) name: PathBuf,
+    pub(crate) children: Vec<File>,
+}
+
+impl Debug for Dir {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Dir").field("name", &self.name).field("children", &self.children).finish()
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use std::collections::VecDeque;
-    use std::path::{Path, PathBuf};
-
     use std::fs;
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn test_walk_dir() {
@@ -70,6 +82,11 @@ mod tests {
                 if path.is_dir() {
                     stack.push_back(path);
                 } else {
+                    let content = fs::read(&path).unwrap();
+                    let raw_file = RawFile {
+                        name: path,
+                        content,
+                    };
                     println!("{:?}", dir.path());
                 }
             }

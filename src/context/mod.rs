@@ -18,7 +18,6 @@ pub struct GitContext {
     pub head: String,
     pub repo: Object,
     pub index: Index,
-    pub workdspace: WorkdSpace,
 }
 
 impl GitContext {
@@ -64,8 +63,6 @@ impl GitContext {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct WorkdSpace {}
 
 #[cfg(test)]
 mod tests {
