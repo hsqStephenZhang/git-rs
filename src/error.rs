@@ -5,6 +5,8 @@ use thiserror::Error;
 pub enum GitError {
     #[error("create `{0}` without permission")]
     PermissionDenied(String),
+    #[error("repo corrupt, please check `{0}`")]
+    CorruptRepo(String),
     #[error("unknown data store error")]
     Unknown,
 }

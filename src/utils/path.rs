@@ -21,6 +21,14 @@ pub fn root_dir() -> Result<PathBuf, ()> {
     Err(())
 }
 
+pub fn object_path(root_path:&PathBuf,name: &str) -> PathBuf
+{
+    let dir_name = root_path.join("objects").join(&name[0..2]);
+    let filename = &name[2..];
+    let full_path = dir_name.join(filename);
+    full_path
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

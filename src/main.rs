@@ -4,7 +4,7 @@ pub mod context;
 pub mod core;
 pub mod db;
 pub mod diff;
-pub mod error;
+mod error;
 pub mod index;
 pub mod object;
 pub mod parser;
@@ -13,6 +13,7 @@ pub mod tree;
 pub mod utils;
 
 use commands::Git;
+pub use error::GitError;
 use structopt::StructOpt;
 
 #[allow(unused_imports)]

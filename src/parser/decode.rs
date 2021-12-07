@@ -13,15 +13,16 @@ use crate::{
         commit::{AuthorInfo, Commit, CommitterInfo},
         Blob, Object, Tree, TreeEntry,
     },
+    refs::Head,
     utils::bytes::{bytes_to_hex, bytes_to_string, bytes_to_usize, hex_to_i32},
 };
 
-pub fn decode<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&[u8], Object, E> {
+pub fn decode_object<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&[u8], Object, E> {
     let mut parser = alt((decode_blob, decode_tree, decode_commit));
     Ok(parser.parse(content)?)
 }
 
-fn decode_blob<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&[u8], Object, E> {
+pub fn decode_blob<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&[u8], Object, E> {
     let parser = tag("blob ".as_bytes());
     let (content, _blob) = parser(content)?;
     let (content, size) = terminated(take_till(|c| c == b'\0'), tag(b"\0"))(content)?;
@@ -31,7 +32,7 @@ fn decode_blob<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&[u8],
     Ok((content, Object::Blob(blob)))
 }
 
-fn decode_tree<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&[u8], Object, E> {
+pub fn decode_tree<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&[u8], Object, E> {
     let parser = tag("tree ".as_bytes());
     let (content, _tree) = parser(content)?;
 
@@ -56,7 +57,7 @@ fn decode_tree<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&[u8],
     Ok((content, Object::Tree(Tree::new(entrys))))
 }
 
-fn decode_commit<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&[u8], Object, E> {
+pub fn decode_commit<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&[u8], Object, E> {
     let parser = tag(b"commit ");
     let (content, _commit) = parser(content)?;
 
@@ -201,6 +202,14 @@ pub fn decode_tree_extension_subtree<'a, E: ParseError<&'a [u8]>>(
     let entry_num = hex_to_i32(entry_num);
     let subtree_num = hex_to_i32(subtree_num);
 
+    let (mut content, hex) = if entry_num != -1 {
+        let hex_parser = take(20usize);
+        let (content, hex) = hex_parser(content)?;
+        (content, Some(hex.to_owned()))
+    } else {
+        (content, None)
+    };
+
     let mut subtrees = Vec::with_capacity(subtree_num as usize);
 
     for _ in 0..subtree_num as usize {
@@ -209,13 +218,7 @@ pub fn decode_tree_extension_subtree<'a, E: ParseError<&'a [u8]>>(
         subtrees.push(subtree);
     }
 
-    let (content, hex) = if entry_num != -1 {
-        let hex_parser = take(20usize);
-        let (content, hex) = hex_parser(content)?;
-        (content, Some(hex.to_owned()))
-    } else {
-        (content, None)
-    };
+
 
     return Ok((
         content,
@@ -257,16 +260,33 @@ pub fn decode_index<'a, E: ParseError<&'a [u8]>>(content: &'a [u8]) -> IResult<&
     Ok((content, index))
 }
 
+// 1. ref: refs/heads/master
+// 2. 48b3d19840c917d8e5990ae629273a0a1cd2b606
+pub fn decode_head_pointer<'a, E: ParseError<&'a [u8]>>(
+    content: &'a [u8],
+) -> IResult<&'a [u8], Head, E> {
+    let ref_parser =
+        tuple((tag(b"ref: "), take_till(|c| c == b'\0' || c == b'\n'))).map(|(_, res): (&[u8], &[u8])| {
+            let s = String::from_utf8(res.into()).unwrap();
+            Head::Ref(s)
+        });
+    let sha1_parser = take(20usize).map(|res: &[u8]| Head::Pointer(res.into()));
+
+    let mut head_parser = alt((ref_parser, sha1_parser));
+    let (content, head) = head_parser.parse(content)?;
+    Ok((content, head))
+}
+
 #[cfg(test)]
 mod tests {
     use nom::{AsBytes, IResult};
 
     use crate::{
-        parser::decode::{decode_commit, decode_tree},
+        parser::decode::{decode_commit, decode_tree, decode_object},
         utils::sha1::decode_file,
     };
 
-    use super::{decode_blob, decode_index};
+    use super::{decode_blob, decode_head_pointer, decode_index};
 
     #[test]
     fn test_blob_decode_encode() {
@@ -279,12 +299,11 @@ mod tests {
         dbg!(&obj);
 
         let r: Vec<u8> = Into::into(&obj);
-        // println!("encode:{:?}", r);
+        println!("encode:{:?}", r);
 
         assert_eq!(content, &r[..]);
     }
 
-    
     #[test]
     fn test_tree_decode_encode() {
         // 8465cd187d9bad9e5a7931c2119f16311f9923a7
@@ -297,7 +316,7 @@ mod tests {
         dbg!(&obj);
 
         let r: Vec<u8> = Into::into(&obj);
-        // println!("encode:{:?}", r);
+        println!("encode:{:?}", r);
 
         assert_eq!(content, &r[..]);
     }
@@ -314,7 +333,7 @@ mod tests {
         dbg!(&obj);
 
         let r: Vec<u8> = Into::into(&obj);
-        // println!("encode:{:?}", r);
+        println!("encode:{:?}", r);
 
         assert_eq!(content, &r[..]);
     }
@@ -355,6 +374,42 @@ mod tests {
     }
 
     #[test]
+    fn test_commit_decode_encode3() {
+        // 6f4f12edec17b6c97795f14fe703fc680111ad83
+        let content = decode_file("./.git/objects/32/e365b38fbc5a064525c99e8f406c85b09c2006");
+        let content = content.as_bytes();
+        // println!("content:{:?}\n\n", content);
+
+        let r: IResult<_, _> = decode_commit(content);
+        let (_, obj) = r.unwrap();
+
+        dbg!(&obj);
+
+        let r: Vec<u8> = Into::into(&obj);
+        // println!("encode :{:?}", r);
+
+        assert_eq!(content, &r[..]);
+    }
+
+    #[test]
+    fn test_object_decode() {
+        // 6f4f12edec17b6c97795f14fe703fc680111ad83
+        let content = decode_file("./.git/objects/32/e365b38fbc5a064525c99e8f406c85b09c2006");
+        let content = content.as_bytes();
+        // println!("content:{:?}\n\n", content);
+
+        let r: IResult<_, _> = decode_object(content);
+        let (_, obj) = r.unwrap();
+
+        dbg!(&obj);
+
+        let r: Vec<u8> = Into::into(&obj);
+        // println!("encode :{:?}", r);
+
+        assert_eq!(content, &r[..]);
+    }
+
+    #[test]
     fn test_decode_index() {
         let content = std::fs::read("data/index").unwrap();
         let content = content.as_bytes();
@@ -372,5 +427,28 @@ mod tests {
         let r: IResult<_, _> = decode_index(content);
         let r = r.unwrap();
         println!("{:?}", r);
+    }
+    #[test]
+    fn test_decode_index3() {
+        let content = std::fs::read(".git/index").unwrap();
+        let content = content.as_bytes();
+
+        let r: IResult<_, _> = decode_index(content);
+        let r = r.unwrap();
+        println!("{:?}", r);
+    }
+    #[test]
+    fn test_decode_header() {
+        // 1. ref: refs/heads/master
+        // 2. 48b3d19840c917d8e5990ae629273a0a1cd2b606
+        let content = &b"ref: refs/heads/master"[..];
+        let r: IResult<_, _> = decode_head_pointer(content);
+        let (_,head)=r.unwrap();
+        println!("{:?}",head);
+
+        let content = &b"48b3d19840c917d8e5990ae629273a0a1cd2b606"[..];
+        let r: IResult<_, _> = decode_head_pointer(content);
+        let (_,head)=r.unwrap();
+        println!("{:?}",head);
     }
 }
