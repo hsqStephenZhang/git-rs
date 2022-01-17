@@ -79,7 +79,8 @@ mod tests {
 
     #[test]
     fn test_walk_dir() {
-        let tree_root = PathBuf::from("/root/rusty/git-rs/src");
+        let mut tree_root = std::env::current_dir().unwrap();
+        tree_root.push("src");
 
         let mut stack = VecDeque::new();
         stack.push_back(tree_root);

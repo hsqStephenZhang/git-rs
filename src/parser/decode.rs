@@ -370,37 +370,15 @@ mod tests {
     }
 
     #[test]
-    fn test_commit_decode_encode3() {
-        // 6f4f12edec17b6c97795f14fe703fc680111ad83
-        let content = decode_file("./.git/objects/32/e365b38fbc5a064525c99e8f406c85b09c2006");
-        let content = content.as_bytes();
-        // println!("content:{:?}\n\n", content);
-
-        let r: IResult<_, _> = decode_commit(content);
-        let (_, obj) = r.unwrap();
-
-        dbg!(&obj);
-
-        let r: Vec<u8> = Into::into(&obj);
-        // println!("encode :{:?}", r);
-
-        assert_eq!(content, &r[..]);
-    }
-
-    #[test]
     fn test_object_decode() {
         // 6f4f12edec17b6c97795f14fe703fc680111ad83
-        let content = decode_file("./.git/objects/32/e365b38fbc5a064525c99e8f406c85b09c2006");
+        let content = decode_file("data/objects/6f/4f12edec17b6c97795f14fe703fc680111ad83");
         let content = content.as_bytes();
-        // println!("content:{:?}\n\n", content);
 
         let r: IResult<_, _> = decode_object(content);
         let (_, obj) = r.unwrap();
 
-        dbg!(&obj);
-
         let r: Vec<u8> = Into::into(&obj);
-        // println!("encode :{:?}", r);
 
         assert_eq!(content, &r[..]);
     }
